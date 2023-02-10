@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: salvatore-test
+  namespace: test1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: salvatore-test
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: salvatore-test
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      initContainers:
+      - image: alpine:3.12
+        name: init-schema
+        env:
+          - name: MYSQL_PWD
+            valueFrom:
+              configMapKeyRef:
+                 name: salvatore-env
+                 key: MYSQL_ROOT_PASSWORD
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                 name: salvatore-env
+                 key: DATABASE_HOST
+        command: ["/bin/sh"]
+        args: ["-c", "apk --no-cache add mysql mysql-client && echo 'Creazione schema test' && mysql -u root -h $DATABASE_HOST -e 'CREATE SCHEMA test;'"]
+      containers:
+      - image: bgpcloudsbx.azurecr.io/salvatore-test:0.0.1
+        name: salvatore-test
+        env:
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              configMapKeyRef:
+                 name: salvatore-env
+                 key: MYSQL_ROOT_PASSWORD
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                 name: salvatore-env
+                 key: DATABASE_HOST
+        ports:
+        - containerPort: 3000
+          name: salvatore-test
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: salvatore-test
+spec:
+  ports:
+    - port: 3000
+  selector:
+    app: salvatore-test
